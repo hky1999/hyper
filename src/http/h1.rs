@@ -441,8 +441,9 @@ pub struct Http11Protocol {
 
 impl Protocol for Http11Protocol {
     fn new_message(&self, host: &str, port: u16, scheme: &str) -> ::Result<Box<HttpMessage>> {
+        debug!("Http11Protocol new of host {}:{} scheme {}", host, port, scheme);
         let stream = try!(self.connector.connect(host, port, scheme)).into();
-
+        debug!("Http11Protocol get stream");
         Ok(Box::new(Http11Message::with_stream(stream)))
     }
 }

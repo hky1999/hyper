@@ -287,7 +287,7 @@ impl<'a> RequestBuilder<'a> {
     pub fn send(self) -> ::Result<Response> {
         let RequestBuilder { client, method, url, headers, body } = self;
         let mut url = try!(url);
-        trace!("send method={:?}, url={:?}, client={:?}", method, url, client);
+        debug!("send method={:?}, url={:?}, client={:#?}", method, url, client);
 
         let can_have_body = match method {
             Method::Get | Method::Head => false,
@@ -304,6 +304,7 @@ impl<'a> RequestBuilder<'a> {
             let mut req = {
                 let (host, port) = try!(get_host_and_port(&url));
                 let mut message = try!(client.protocol.new_message(&host, port, url.scheme()));
+                debug!("get message okay");
                 if url.scheme() == "http" && client.proxy.is_some() {
                     message.set_proxied(true);
                 }
@@ -316,26 +317,32 @@ impl<'a> RequestBuilder<'a> {
                 if let Some(ref headers) = headers {
                     h.extend(headers.iter());
                 }
+                debug!("generate header {:#?}", h.clone());
                 let headers = h;
                 Request::with_headers_and_message(method.clone(), url.clone(), headers, message)
             };
+            debug!("generate req ok");
 
             try!(req.set_write_timeout(client.write_timeout));
             try!(req.set_read_timeout(client.read_timeout));
 
+            debug!("req set timeout success");
+
             match (can_have_body, body.as_ref()) {
                 (true, Some(body)) => match body.size() {
                     Some(size) => req.headers_mut().set(ContentLength(size)),
-                    None => (), // chunked, Request will add it automatically
+                    None => (), // chunked, Request will add it automatically``
                 },
                 (true, None) => req.headers_mut().set(ContentLength(0)),
                 _ => () // neither
             }
+            debug!("req start");
             let mut streaming = try!(req.start());
             if let Some(mut rdr) = body.take() {
                 try!(copy(&mut rdr, &mut streaming));
             }
             let res = try!(streaming.send());
+            debug!("get response of status {:?}", res.status);
             if !res.status.is_redirection() {
                 return Ok(res)
             }
